@@ -25,6 +25,7 @@ type Result struct {
 	RecommendedFix  string   `json:"recommended_fix"`
 	StatusCodes     map[string]string `json:"status_codes,omitempty"`
 	Verification    map[string]bool    `json:"verification,omitempty"`
+	ErrorMessages   map[string]string  `json:"error_messages,omitempty"`
 }
 
 // List of .git endpoints to check
@@ -54,8 +55,20 @@ var paths = []string{
 // Function to check for exposed .git files
 func checkGitExposure(url string, results chan<- Result, wg *sync.WaitGroup) {
 	defer wg.Done()
-	client := &http.Client{Timeout: 5 * time.Second}
-	result := Result{URL: url, Exposed: false, RecommendedFix: "Restrict access to the .git directory via web server settings.", StatusCodes: make(map[string]string), Verification: make(map[string]bool)}
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return nil // Follow redirects
+		},
+	}
+	result := Result{
+		URL:             url,
+		Exposed:         false,
+		RecommendedFix:  "Restrict access to the .git directory via web server settings.",
+		StatusCodes:     make(map[string]string),
+		Verification:    make(map[string]bool),
+		ErrorMessages:   make(map[string]string),
+	}
 
 	// Perform a test request to a non-existent path to detect default responses
 	testPath := "/random-nonexistent-check"
@@ -67,6 +80,26 @@ func checkGitExposure(url string, results chan<- Result, wg *sync.WaitGroup) {
 		testResponseLength = len(strings.TrimSpace(string(testBody)))
 	}
 
+	errorMessages := []string{
+		"not found", "page not found", "requested url was not found",
+		"no such file or directory", "does not exist", "invalid request",
+		"error", "access denied", "forbidden", "unauthorized", "oops",
+		"this page is missing", "resource unavailable", "site can't be reached",
+		"something went wrong", "nginx default page", "apache server at",
+		"index of /", "403 forbidden", "welcome to nginx", "powered by",
+		"directory listing for", "your request could not be processed",
+		"this site is under maintenance", "coming soon", "invalid request",
+		"site under construction", "temporary error", "account suspended",
+		"maintenance mode", "internal server error", "bad request",
+		"error 404", "404 not found", "500 internal server error",
+		"we are currently experiencing issues", "undergoing maintenance",
+		"this service is currently unavailable", "try again later",
+		"your request could not be completed", "invalid input",
+		"page is missing", "default server page", "403 forbidden",
+		"401 unauthorized", "nginx error", "server configuration error",
+		"missing resource", "this url is invalid","Sorry","404","sorry",
+	}
+
 	for _, path := range paths {
 		resp, err := client.Get(url + path)
 		if err != nil {
@@ -74,12 +107,6 @@ func checkGitExposure(url string, results chan<- Result, wg *sync.WaitGroup) {
 			continue
 		}
 		defer resp.Body.Close()
-
-		// Detect redirects (Avoid fake 200 responses)
-		if resp.Request.URL.String() != url+path {
-			result.StatusCodes[path] = fmt.Sprintf("Redirected to %s", resp.Request.URL.String())
-			continue
-		}
 
 		body, _ := ioutil.ReadAll(resp.Body)
 		bodyString := strings.TrimSpace(string(body))
@@ -101,6 +128,19 @@ func checkGitExposure(url string, results chan<- Result, wg *sync.WaitGroup) {
 				result.Exposed = true
 				result.LeakedFiles = append(result.LeakedFiles, path)
 				result.Verification[path] = true
+
+				// Check for error messages in the response body
+				errorCount := 0
+				for _, msg := range errorMessages {
+					if strings.Contains(strings.ToLower(bodyString), msg) {
+						errorCount++
+						result.ErrorMessages[path] = fmt.Sprintf("%d Error Messages Found: %s", errorCount, msg)
+						break
+					}
+				}
+				if errorCount == 0 {
+					result.ErrorMessages[path] = "No Error Messages Found"
+				}
 
 				// If it's .git/HEAD, try to extract branch name
 				if path == "/.git/HEAD" {
@@ -248,7 +288,8 @@ func main() {
 					if !result.Verification[file] {
 						verification = "Not Verified"
 					}
-					statusColor.Printf("   - %s (Status: %s, %s)\n", file, status, verification)
+					errorMessage := result.ErrorMessages[file]
+					statusColor.Printf("   - %s (Status: %s, %s, %s)\n", file, status, verification, errorMessage)
 				}
 				if result.BranchName != "" {
 					color.Yellow("🔀 Detected Branch: %s", result.BranchName)
