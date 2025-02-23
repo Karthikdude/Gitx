@@ -98,6 +98,10 @@ func checkGitExposure(url string, results chan<- Result, wg *sync.WaitGroup) {
 		"page is missing", "default server page", "403 forbidden",
 		"401 unauthorized", "nginx error", "server configuration error",
 		"missing resource", "this url is invalid","Sorry","404","sorry",
+		"Error 404","The requested URL was rejected","The Page you are looking for can't be found",
+		"Illegal host","File or directory not found","The resource you are looking for might have been removed",
+		"temporarily unavailable","Your support ID is","Error 404",
+		"Page you are looking for is not found!",
 	}
 
 	for _, path := range paths {
