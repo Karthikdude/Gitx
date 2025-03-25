@@ -39,7 +39,7 @@ Clone the repository and build the application:
 ```bash
 git clone https://github.com/Karthikdude/Gitx
 cd Gitx
-go build -o exposed-git-detector
+go build -o gitx.go
 ```
 
 ## Usage
