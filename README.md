@@ -1,4 +1,4 @@
-```markdown
+
 # Exposed .git Detector
 
 A modern and efficient Go application designed to detect exposed `.git` repositories on web servers. This tool helps identify security risks and provides actionable recommendations to prevent potential exploits. 
