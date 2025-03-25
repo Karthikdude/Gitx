@@ -133,8 +133,5 @@ This project is licensed under the MIT License. See the `LICENSE` file for detai
 
 ---
 
-**Author:** Your Name  
-**Contact:** [your-email@example.com](mailto:your-email@example.com)
-```
-
-This README is detailed, modern, and includes all essential sections to guide users and contributors. Let me know if you'd like to customize any part further!
+**Author:** Karthik S Sathyan  
+**Contact:** [karthikssathyan1@gmail.com](mailto:karthikssathyan1@gmail.com)
